@@ -693,6 +693,7 @@ class Prompt2PromptPipeline(
 
 # Copied from https://github.com/RoyiRa/prompt-to-prompt-with-sdxl
 class P2PCrossAttnProcessor:
+    from diffusers.models.attention_processor import Attention
 
     def __init__(self, controller, place_in_unet):
         super().__init__()
@@ -700,7 +701,7 @@ class P2PCrossAttnProcessor:
         self.place_in_unet = place_in_unet
 
     def __call__(self,
-                 attn: diffusers.models.attention.Attention,
+                 attn: Attention,
                  hidden_states,
                  encoder_hidden_states=None,
                  attention_mask=None):
