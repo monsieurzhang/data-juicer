@@ -24,7 +24,7 @@ class FileLock(HF_FileLock):
         super()._release()
         try:
             # logger.debug(f'Remove {self._lock_file}')
-            os.remove(self._lock_file)
+            os.remove(self.lock_file)
         # The file is already deleted and that's what we want.
         except OSError:
             pass
