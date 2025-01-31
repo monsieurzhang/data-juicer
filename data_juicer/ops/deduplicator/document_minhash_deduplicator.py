@@ -16,10 +16,12 @@ from typing_extensions import Annotated
 
 from data_juicer.utils.constant import HashKeys
 from data_juicer.utils.lazy_loader import LazyLoader
-from data_juicer.utils.model_utils import prepare_sentencepiece_model
+from data_juicer.utils.model_utils import prepare_sentencepiece_model, prepare_onmt_bpe_model
 
 from ..base_op import OPERATORS, Deduplicator
 from ..common.helper_func import UnionFind, split_on_whitespace
+
+import pyonmttok
 
 integrate = LazyLoader('integrate', 'scipy.integrate')
 
@@ -115,7 +117,9 @@ class DocumentMinhashDeduplicator(Deduplicator):
         jaccard_threshold: Annotated[float, Field(ge=0, le=1)] = 0.7,
         num_bands: Optional[PositiveInt] = None,
         num_rows_per_band: Optional[PositiveInt] = None,
-        tokenizer_model: Optional[str] = None,
+        tokenizer_model: Optional[str] = None,  # for sp and bpe
+        tokenizer_vocab: Optional[str] = None,  # for bpe
+        tokenizer_config: Optional[str] = None,  # for bpe, config file name
         *args,
         **kwargs,
     ):
@@ -171,6 +175,11 @@ class DocumentMinhashDeduplicator(Deduplicator):
                 raise ValueError("To use 'sentencepiece' tokenization, "
                                  "'tokenizer_model' is required.")
             self.tokenizer = prepare_sentencepiece_model(tokenizer_model)
+        elif self.tokenization == 'onmt-bpe':       # in short: bpe
+            if tokenizer_config is None:
+                raise ValueError("To use 'onmt-bpe' tokenization, "
+                                 "'tokenizer_config' is required.")
+            self.tokenizer = prepare_onmt_bpe_model(tokenizer_config, tokenizer_model, tokenizer_vocab)
         else:
             self.tokenizer = None
 
@@ -243,6 +252,13 @@ class DocumentMinhashDeduplicator(Deduplicator):
             }
         elif self.tokenization == 'sentencepiece':
             tokens = self.tokenizer.encode(text, out_type=str)
+            tokens = {
+                str.encode(''.join(tokens[i:i + self.window_size]))
+                for i in range(len(tokens) - self.window_size)
+            }
+        elif self.tokenization == 'onmt-bpe':
+            tokens = self.tokenizer(text)
+            logger.info(f"After tokenization: {tokens}")
             tokens = {
                 str.encode(''.join(tokens[i:i + self.window_size]))
                 for i in range(len(tokens) - self.window_size)

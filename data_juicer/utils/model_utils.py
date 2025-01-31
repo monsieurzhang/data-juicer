@@ -16,6 +16,9 @@ from data_juicer.utils.lazy_loader import AUTOINSTALL, LazyLoader
 
 from .cache_utils import DATA_JUICER_MODELS_CACHE as DJMC
 
+import pyonmttok
+import json
+
 torch = LazyLoader('torch', 'torch')
 transformers = LazyLoader('transformers', 'transformers')
 nn = LazyLoader('nn', 'torch.nn')
@@ -515,6 +518,26 @@ def prepare_sentencepiece_model(model_path, **model_params):
     except:  # noqa: E722
         sentencepiece_model.load(check_model(model_path, force=True))
     return sentencepiece_model
+
+def prepare_onmt_bpe_model(config_file, model_path, vocab_path):
+    """
+    Prepare and load a onmt-bpe model.
+    https://github.com/OpenNMT/Tokenizer
+
+    :param config_file: tokenizer config file
+    :param model_path: input model path
+    :param vocab_path: input model path
+    :return: model instance
+    """
+    logger.info(f'Loading onmt-bpe model from config: {config_file}...')
+    with open(config_file) as json_file:
+        config = json.load(json_file)
+        if model_path:
+            config["bpe_model_path"] = model_path
+        if vocab_path:
+            config["vocabulary_path"] = vocab_path
+
+    return pyonmttok.Tokenizer(**config)
 
 
 def prepare_sentencepiece_for_lang(lang,
