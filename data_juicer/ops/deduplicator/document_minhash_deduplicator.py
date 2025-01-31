@@ -22,6 +22,7 @@ from ..base_op import OPERATORS, Deduplicator
 from ..common.helper_func import UnionFind, split_on_whitespace
 
 import pyonmttok
+import random
 
 integrate = LazyLoader('integrate', 'scipy.integrate')
 
@@ -252,13 +253,16 @@ class DocumentMinhashDeduplicator(Deduplicator):
             }
         elif self.tokenization == 'sentencepiece':
             tokens = self.tokenizer.encode(text, out_type=str)
+            if random.random() < 1/1000:
+                logger.debug(f"After tokenization: {tokens}")
             tokens = {
                 str.encode(''.join(tokens[i:i + self.window_size]))
                 for i in range(len(tokens) - self.window_size)
             }
         elif self.tokenization == 'onmt-bpe':
             tokens = self.tokenizer(text)
-            logger.info(f"After tokenization: {tokens}")
+            if random.random() < 1/1000:
+                logger.debug(f"After tokenization: {tokens}")
             tokens = {
                 str.encode(''.join(tokens[i:i + self.window_size]))
                 for i in range(len(tokens) - self.window_size)
