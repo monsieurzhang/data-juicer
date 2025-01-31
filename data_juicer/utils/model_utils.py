@@ -16,7 +16,7 @@ from data_juicer.utils.lazy_loader import AUTOINSTALL, LazyLoader
 
 from .cache_utils import DATA_JUICER_MODELS_CACHE as DJMC
 
-import pyonmttok
+from data_juicer.utils.onmt_tokenizer import PickleableTokenizer
 import json
 
 torch = LazyLoader('torch', 'torch')
@@ -537,7 +537,7 @@ def prepare_onmt_bpe_model(config_file, model_path, vocab_path):
         if vocab_path:
             config["vocabulary_path"] = vocab_path
 
-    return pyonmttok.Tokenizer(**config)
+    return PickleableTokenizer(**config)
 
 
 def prepare_sentencepiece_for_lang(lang,
