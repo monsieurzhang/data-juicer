@@ -221,6 +221,17 @@ class DocumentMinhashDeduplicator(Deduplicator):
         :param sample: input sample
         :return: sample with minhash value.
         """
+        def create_window_tokens(tokens, joiner=" "):
+            if random.random() < 1/1000:
+                logger.debug(f"After tokenization: {tokens}")
+            # for shorter input, use the whole sequence
+            size = self.window_size if len(tokens) > self.window_size else len(tokens)-1
+            tokens = {
+                str.encode(joiner.join(tokens[i:i + size]))
+                for i in range(len(tokens) - size)
+            }
+            return tokens
+
         # check if it's computed already
         if HashKeys.minhash in sample:
             return sample
@@ -241,32 +252,16 @@ class DocumentMinhashDeduplicator(Deduplicator):
             }
         elif self.tokenization == 'punctuation':
             tokens = self.punctuation_pattern.split(text)
-            tokens = {
-                str.encode(' '.join(tokens[i:i + self.window_size]))
-                for i in range(len(tokens) - self.window_size)
-            }
+            tokens = create_window_tokens(tokens)
         elif self.tokenization == 'space':
             tokens = split_on_whitespace(text)
-            tokens = {
-                str.encode(' '.join(tokens[i:i + self.window_size]))
-                for i in range(len(tokens) - self.window_size)
-            }
+            tokens = create_window_tokens(tokens)
         elif self.tokenization == 'sentencepiece':
             tokens = self.tokenizer.encode(text, out_type=str)
-            if random.random() < 1/1000:
-                logger.debug(f"After tokenization: {tokens}")
-            tokens = {
-                str.encode(''.join(tokens[i:i + self.window_size]))
-                for i in range(len(tokens) - self.window_size)
-            }
+            tokens = create_window_tokens(tokens, joiner="")
         elif self.tokenization == 'onmt-bpe':
             tokens = self.tokenizer(text)
-            if random.random() < 1/1000:
-                logger.debug(f"After tokenization: {tokens}")
-            tokens = {
-                str.encode(''.join(tokens[i:i + self.window_size]))
-                for i in range(len(tokens) - self.window_size)
-            }
+            tokens = create_window_tokens(tokens, joiner="")
         else:
             raise NotImplementedError(
                 f'Unimplemented tokenization method [{self.tokenization}]')
@@ -286,6 +281,7 @@ class DocumentMinhashDeduplicator(Deduplicator):
             bytes(hash_values[start:end].byteswap().data)
             for start, end in self.hash_ranges
         ]
+
         return sample
 
     def process(self, dataset, show_num=0):
