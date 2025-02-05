@@ -11,12 +11,14 @@ from pydantic import Field, PositiveInt
 from typing_extensions import Annotated
 
 from data_juicer.utils.constant import HashKeys
-from data_juicer.utils.model_utils import prepare_sentencepiece_model
+from data_juicer.utils.model_utils import prepare_sentencepiece_model, prepare_onmt_bpe_model
 
 from ..base_op import OPERATORS, Deduplicator
 from ..common.helper_func import split_on_whitespace
 from .document_minhash_deduplicator import (MAX_HASH, MERSENNE_PRIME,
                                             optimal_param, sha1_hash32)
+
+# import random
 
 BATCH_SIZE = 1000
 
@@ -252,7 +254,9 @@ class RayBTSMinhashDeduplicator(Deduplicator):
         jaccard_threshold: Annotated[float, Field(ge=0, le=1)] = 0.7,
         num_bands: Optional[PositiveInt] = None,
         num_rows_per_band: Optional[PositiveInt] = None,
-        tokenizer_model: Optional[str] = None,
+        tokenizer_model: Optional[str] = None,  # for sp and bpe
+        tokenizer_vocab: Optional[str] = None,  # for bpe
+        tokenizer_config: Optional[str] = None,  # for bpe, config file name
         union_find_parallel_num: Union[int, str] = 'auto',
         union_threshold: Optional[int] = 256,
         max_pending_edge_buffer_task: Optional[int] = 20,
@@ -331,8 +335,25 @@ class RayBTSMinhashDeduplicator(Deduplicator):
                 raise ValueError("To use 'sentencepiece' tokenization, "
                                  "'tokenizer_model' is required.")
             self.tokenizer = prepare_sentencepiece_model(tokenizer_model)
+        elif self.tokenization == 'onmt-bpe':       # in short: bpe
+            if tokenizer_config is None:
+                raise ValueError("To use 'onmt-bpe' tokenization, "
+                                 "'tokenizer_config' is required.")
+            self.tokenizer = prepare_onmt_bpe_model(tokenizer_config, tokenizer_model, tokenizer_vocab)
         else:
             self.tokenizer = None
+
+        def create_window_tokens(tokens, joiner=" "):
+            # cannot use logger ?
+            # if random.random() < 1/1000:
+            #     logger.debug(f"After tokenization: {tokens}")
+            # for shorter input, use the whole sequence
+            size = self.window_size if len(tokens) > self.window_size else len(tokens)-1
+            tokens = {
+                str.encode(joiner.join(tokens[i:i + size]))
+                for i in range(len(tokens) - size)
+            }
+            return tokens
 
         if self.tokenization == 'character':
 
@@ -345,26 +366,22 @@ class RayBTSMinhashDeduplicator(Deduplicator):
 
             def tokenization_func(text):
                 tokens = self.punctuation_pattern.split(text)
-                return {
-                    str.encode(' '.join(tokens[i:i + self.window_size]))
-                    for i in range(len(tokens) - self.window_size)
-                }
+                return create_window_tokens(tokens)
         elif self.tokenization == 'space':
 
             def tokenization_func(text):
                 tokens = split_on_whitespace(text)
-                return {
-                    str.encode(' '.join(tokens[i:i + self.window_size]))
-                    for i in range(len(tokens) - self.window_size)
-                }
+                return create_window_tokens(tokens)
         elif self.tokenization == 'sentencepiece':
 
             def tokenization_func(text):
                 tokens = self.tokenizer.encode(text, out_type=str)
-                return {
-                    str.encode(''.join(tokens[i:i + self.window_size]))
-                    for i in range(len(tokens) - self.window_size)
-                }
+                return create_window_tokens(tokens, joiner="")
+        elif self.tokenization == 'onmt-bpe':
+
+            def tokenization_func(text):
+                tokens = self.tokenizer(text)
+                return create_window_tokens(tokens, joiner="")
         else:
             raise NotImplementedError(
                 f'Unimplemented tokenization method [{self.tokenization}]')

@@ -21,7 +21,6 @@ from data_juicer.utils.model_utils import prepare_sentencepiece_model, prepare_o
 from ..base_op import OPERATORS, Deduplicator
 from ..common.helper_func import UnionFind, split_on_whitespace
 
-import pyonmttok
 import random
 
 integrate = LazyLoader('integrate', 'scipy.integrate')
